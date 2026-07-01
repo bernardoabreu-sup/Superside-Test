@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Hello World JSON Visualiser</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #171a23;
+    --text: #e6e8ef;
+    --muted: #8b92a6;
+    --key: #7dd3fc;
+    --string: #a3e635;
+    --number: #fbbf24;
+    --boolean: #f472b6;
+    --null: #94a3b8;
+    --border: #262a37;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--bg);
+    color: var(--text);
+    padding: 2rem 1rem;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0 0 0.25rem;
+    color: var(--text);
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-bottom: 1.25rem;
+  }
+  #source-note {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-bottom: 0.75rem;
+  }
+  .tree {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+  ul { list-style: none; margin: 0; padding-left: 1.25rem; }
+  .node > .row { display: flex; align-items: baseline; gap: 0.35rem; cursor: default; }
+  .node.collapsible > .row { cursor: pointer; }
+  .toggle {
+    display: inline-block;
+    width: 0.9rem;
+    color: var(--muted);
+    user-select: none;
+  }
+  .key { color: var(--key); }
+  .colon { color: var(--muted); }
+  .val-string { color: var(--string); }
+  .val-number { color: var(--number); }
+  .val-boolean { color: var(--boolean); }
+  .val-null { color: var(--null); }
+  .meta { color: var(--muted); font-size: 0.75rem; }
+  .collapsed > ul { display: none; }
+  .brace { color: var(--muted); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Hello World JSON Visualiser</h1>
+    <div class="subtitle">A minimal, dependency-free JSON tree viewer.</div>
+    <div id="source-note">Loading data…</div>
+    <div id="tree" class="tree"></div>
+  </div>
+
+<script>
+  // Fallback data lets this page render standalone (e.g. in a single-file
+  // preview) even when fetching the sibling hello.json isn't possible.
+  const FALLBACK_DATA = {
+    "message": "Hello, World!",
+    "author": "Claude",
+    "repository": "bernardoabreu-sup/superside-test",
+    "createdAt": "2026-07-01",
+    "tags": ["demo", "json", "visualiser"],
+    "stats": { "views": 0, "stars": 0, "isPublic": true },
+    "contributors": [
+      { "name": "Bernardo Abreu", "role": "owner" },
+      { "name": "Claude", "role": "assistant" }
+    ]
+  };
+
+  function typeOf(v) {
+    if (v === null) return "null";
+    if (Array.isArray(v)) return "array";
+    return typeof v;
+  }
+
+  function renderValue(v) {
+    const t = typeOf(v);
+    if (t === "string") return `<span class="val-string">"${escapeHtml(v)}"</span>`;
+    if (t === "number") return `<span class="val-number">${v}</span>`;
+    if (t === "boolean") return `<span class="val-boolean">${v}</span>`;
+    if (t === "null") return `<span class="val-null">null</span>`;
+    return "";
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+
+  function buildNode(key, value, isLast) {
+    const t = typeOf(value);
+    const li = document.createElement("li");
+
+    if (t === "object" || t === "array") {
+      const entries = t === "array" ? value.map((v, i) => [i, v]) : Object.entries(value);
+      const node = document.createElement("div");
+      node.className = "node collapsible";
+
+      const row = document.createElement("div");
+      row.className = "row";
+      const openBrace = t === "array" ? "[" : "{";
+      const closeBrace = t === "array" ? "]" : "}";
+      row.innerHTML =
+        `<span class="toggle">▾</span>` +
+        (key !== null ? `<span class="key">${escapeHtml(key)}</span><span class="colon">:</span> ` : "") +
+        `<span class="brace">${openBrace}</span>` +
+        `<span class="meta">&nbsp;${entries.length} ${t === "array" ? "items" : "keys"}</span>` +
+        `<span class="brace close-inline" style="display:none">${closeBrace}</span>`;
+
+      row.addEventListener("click", () => {
+        node.classList.toggle("collapsed");
+        const toggle = row.querySelector(".toggle");
+        toggle.textContent = node.classList.contains("collapsed") ? "▸" : "▾";
+      });
+
+      const ul = document.createElement("ul");
+      entries.forEach(([k, v], idx) => {
+        ul.appendChild(buildNode(t === "array" ? null : k, v, idx === entries.length - 1));
+      });
+
+      node.appendChild(row);
+      node.appendChild(ul);
+      li.appendChild(node);
+    } else {
+      const row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML =
+        `<span class="toggle"></span>` +
+        (key !== null ? `<span class="key">${escapeHtml(key)}</span><span class="colon">:</span> ` : "") +
+        renderValue(value);
+      li.appendChild(row);
+    }
+    return li;
+  }
+
+  function render(data) {
+    const root = document.getElementById("tree");
+    root.innerHTML = "";
+    const ul = document.createElement("ul");
+    ul.style.paddingLeft = "0";
+    ul.appendChild(buildNode(null, data, true));
+    root.appendChild(ul);
+  }
+
+  async function load() {
+    const note = document.getElementById("source-note");
+    try {
+      const res = await fetch("hello.json");
+      if (!res.ok) throw new Error("fetch failed");
+      const data = await res.json();
+      note.textContent = "Source: hello.json (fetched)";
+      render(data);
+    } catch (e) {
+      note.textContent = "Source: embedded fallback data (hello.json not reachable in this context)";
+      render(FALLBACK_DATA);
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>

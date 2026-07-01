@@ -1,0 +1,16 @@
+{
+  "message": "Hello, World!",
+  "author": "Claude",
+  "repository": "bernardoabreu-sup/superside-test",
+  "createdAt": "2026-07-01",
+  "tags": ["demo", "json", "visualiser"],
+  "stats": {
+    "views": 0,
+    "stars": 0,
+    "isPublic": true
+  },
+  "contributors": [
+    { "name": "Bernardo Abreu", "role": "owner" },
+    { "name": "Claude", "role": "assistant" }
+  ]
+}
